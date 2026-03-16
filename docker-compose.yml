@@ -1,0 +1,46 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: quant-platform-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quant_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-quant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quant}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/sql/init:/docker-entrypoint-initdb.d
+
+  api:
+    build:
+      context: ./backend
+    container_name: quant-platform-api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://quant:quant@db:5432/quant_platform
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  web:
+    build:
+      context: ./frontend
+    container_name: quant-platform-web
+    env_file:
+      - .env
+    depends_on:
+      - api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:
